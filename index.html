@@ -1,0 +1,200 @@
+<html>
+
+<head>
+  <style type="text/css">
+    .title {
+      position: relative;
+      top: -12px;
+    }
+
+    .agendaOption {
+      /* border-top-style: solid;
+      border-top-width: thin; */
+    }
+    
+    .timeIndicator {
+      word-break: break-all;
+    }
+
+    #timeTip {
+      position: fixed;
+      right: 0;
+      background-color: crimson;
+      color: white;
+      padding: 6px;
+      font-size: 48px;
+    }
+
+    body {
+      padding: 0;
+      margin: 0;
+      font-family: "SimHei";
+      font-size: 24px;
+    }
+  </style>
+
+</head>
+
+<body>
+  <div id="timeTip">现在时间：<span id="nowTime"></span></div>
+  <h1>寒假作业日程表</h1>
+  <p id="content"></p>
+  <script id="contentItemTemplate" type="text/template">
+    <div class="agendaOption">
+      <p class="timeLine">
+        <span class="timeIndicator"></span>
+        <progress class="timeProgress" value="#{PROGRESS_VALUE}" max="#{PROGRESS_MAX}"></progress>
+      </p>
+      <p class="title"><label><input type="checkbox" />#{AGENDA_RULE}</label></p>
+    </div>
+  </script>
+  <script type="text/javascript">
+    var AGENDA_RULE_SET = [
+      "09:30~10:15 数学小卷三页",
+      "10:15~10:30 用小猿口算检查改正错题",
+      "10:30~10:45 休息15分钟，蹦床或跳绳200次",
+      "10:45~11:00 英语，听一个Unit的朗读(会背后学下一个Unit)",
+      "11:00~11:15 英语，阅读听过的Unit五遍",
+      "11:15~11:45 英语默写一页(先背诵，再找出并写下生词，书空生词，默写整页)",
+      "11:45~14:00 中午休息",
+      "14:00~14:30 下学期语文书，每日读一课，读两遍",
+      "14:30~15:15 默写一首会背的古诗(先背诵，再找出并写下生字，书空生字，默写)",
+      "15:15~15:30 读古诗十遍，长的读一首就行，短的需要读两首(会背诵后就换新的读)",
+      "15:30~15:45 休息15分钟，蹦床或跳绳200次",
+      "15:45~16:15 斑马英语",
+      "16:15~17:00 攀登三本书",
+      "19:30~20:15 英语会读会写一个 Module单词(两天内完成，自己找时间)"
+    ];
+  </script>
+  <script type="text/javascript">
+    var TIME_USED_ICON = "■";
+    var TIME_LEFT_ICON = "□";
+    var ACTIVE_COLOR = "lightgreen";
+    var agendaOptionSet = [];
+
+    /**
+     *
+     */
+    function checkSyntax() { }
+
+    /**
+     *
+     */
+    function setupAgendaOptionSet() {
+      if (this.initialised) {
+        return;
+      }
+      this.initialised = true;
+
+      var agendaTitleList = document.getElementsByClassName("title");
+      var agendaOptionList = document.getElementsByClassName("agendaOption");
+      for (var i = 0; i < AGENDA_RULE_SET.length; i++) {
+        var agendaOption = {};
+        agendaOption.timeStart = AGENDA_RULE_SET[i].replace(/^(.{5}).+$/, "$1");
+        agendaOption.timeEnd = AGENDA_RULE_SET[i].replace(/^.{6}(.{5}).+$/, "$1");
+        agendaOption.timeLength = diffTimeByMinutes(agendaOption.timeStart, agendaOption.timeEnd);
+        agendaOption.title = AGENDA_RULE_SET[i].substr(12);
+        agendaOption.elementTop = agendaOptionList[i];
+        agendaOption.elementTitle = agendaTitleList[i];
+        agendaOptionSet.push(agendaOption);
+      }
+    }
+
+    /**
+     *
+     */
+    function diffTimeByMinutes(timeStart, timeEnd) {
+      return (timeEnd.substr(0, 2) - timeStart.substr(0, 2)) * 60 + (timeEnd.substr(3, 2) - 0) - timeStart.substr(3, 2);
+    }
+
+    /**
+     *
+     */
+    function isTimeBetween(timeStart, timeEnd, timeSlot) {
+      return diffTimeByMinutes(timeStart, timeSlot) >= 0 && diffTimeByMinutes(timeSlot, timeEnd) >= 0;
+    }
+    
+    /**
+     *
+     */
+    function paintProgress(value, max, i) {
+      var progressElement = document.getElementsByClassName("timeProgress")[i];
+      progressElement.value = value;
+      progressElement.max = max;
+    }
+
+    /**
+     *
+     */
+    function paintTimeLine() {
+      var timeIndicators = document.getElementsByClassName("timeIndicator");
+
+      if (!this.initialised) {
+        // once only
+        for (var i = 0; i < agendaOptionSet.length; i++) {
+          timeIndicators[i].innerHTML = TIME_LEFT_ICON.repeat(agendaOptionSet[i].timeLength);
+        }
+        this.initialised = true;
+      }
+
+      // execute repeatedly
+      var nowTime = nowTimeOfHourMinuteFormat();
+      for (var i = 0; i < agendaOptionSet.length; i++) {
+        var agendaOption = agendaOptionSet[i];
+        var timeLength = agendaOptionSet[i].timeLength;
+        if (diffTimeByMinutes(nowTime, agendaOption.timeStart) > 0) {
+          //timeIndicators[i].innerHTML = TIME_LEFT_ICON.repeat(timeLength);
+          agendaOption.elementTop.style.backgroundColor = "";
+          paintProgress(0, timeLength, i);
+        } else if (diffTimeByMinutes(agendaOption.timeEnd, nowTime) >= 0) {
+          //timeIndicators[i].innerHTML = TIME_USED_ICON.repeat(timeLength);
+          agendaOption.elementTop.style.backgroundColor = "";
+          paintProgress(timeLength, timeLength, i);
+        } else if (isTimeBetween(agendaOption.timeStart, agendaOption.timeEnd, nowTime)) {
+          var timeUsed = diffTimeByMinutes(agendaOption.timeStart, nowTime);
+          var timeLeft = diffTimeByMinutes(nowTime, agendaOption.timeEnd);
+          //timeIndicators[i].innerHTML = TIME_USED_ICON.repeat(timeUsed) + TIME_LEFT_ICON.repeat(timeLeft);
+          agendaOption.elementTop.style.backgroundColor = ACTIVE_COLOR;
+          paintProgress(timeUsed, timeLength, i);
+        }
+      }
+    }
+
+    /**
+     *
+     */
+    function paintNowTime() {
+      document.getElementById("nowTime").innerHTML = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+
+    /**
+     *
+     */
+    function paintContent() {
+      var contentItemListBuilder = [];
+      var template = document.getElementById("contentItemTemplate").innerHTML;
+      for (var i = 0; i < AGENDA_RULE_SET.length; i++) {
+        contentItemListBuilder.push(template.replace("#{AGENDA_RULE}", AGENDA_RULE_SET[i]));
+      }
+      document.getElementById("content").innerHTML = contentItemListBuilder.join("");
+    }
+
+    function nowTimeOfHourMinuteFormat() {
+      return new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit' });
+    }
+
+    /**
+     *
+     */
+    function configureTimer() {
+      setInterval(paintNowTime, 1000);
+      setInterval(paintTimeLine, 800);
+      setInterval(setupAgendaOptionSet, 50);
+    }
+    checkSyntax();
+    paintContent();
+    configureTimer();
+  </script>
+</body>
+
+</html>
